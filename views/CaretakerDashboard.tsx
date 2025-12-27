@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import DashboardCard from '../components/DashboardCard';
-import { Phone, Heart, AlertCircle, MessageSquare, History, X, Plus, Activity } from 'lucide-react';
+import { Phone, Heart, AlertCircle, History, X, Plus, Activity } from 'lucide-react';
 
 interface Note {
   id: string;
@@ -104,12 +104,6 @@ const CaretakerDashboard: React.FC<{ user: User }> = ({ user }) => {
             </button>
           </div>
         </DashboardCard>
-      </div>
-
-      <div className="fixed bottom-24 right-6 z-30">
-        <button className="w-16 h-16 bg-indigo-500 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-indigo-500/40 border-4 border-white dark:border-black">
-          <MessageSquare className="w-7 h-7" />
-        </button>
       </div>
 
       {/* Add Note Modal */}
