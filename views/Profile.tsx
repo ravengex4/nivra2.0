@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, LogOut, Shield, Settings, Bell, CreditCard, ChevronRight, 
   Sun, Moon, ChevronLeft, Music, Palette, Fingerprint, Users, Share2, 
@@ -17,11 +17,27 @@ interface Props {
   toggleTheme: () => void;
 }
 
-type ProfileView = 'MENU' | 'NOTIFICATIONS' | 'SECURITY' | 'DEVICE' | 'BILLING';
+type ProfileView = 'MENU' | 'NOTIFICATIONS' | 'SECURITY' | 'BILLING';
 
 const Profile: React.FC<Props> = ({ user, onLogout, isDarkMode, toggleTheme }) => {
   const [activeView, setActiveView] = useState<ProfileView>('MENU');
   
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state?.tab === 'profile') {
+        setActiveView(event.state.subView || 'MENU');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigateTo = (view: ProfileView) => {
+    setActiveView(view);
+    window.history.pushState({ tab: 'profile', subView: view }, '', '');
+  };
+
   const [selectedTone, setSelectedTone] = useState('Alert High');
   const [alertColor, setAlertColor] = useState('rose');
   const [testingNotification, setTestingNotification] = useState(false);
@@ -30,11 +46,6 @@ const Profile: React.FC<Props> = ({ user, onLogout, isDarkMode, toggleTheme }) =
   const [twoFactor, setTwoFactor] = useState(false);
   const [emergencyContact, setEmergencyContact] = useState('+1 555 0123');
   const [isExporting, setIsExporting] = useState(false);
-
-  const [sensitivity, setSensitivity] = useState(75);
-  const [vibration, setVibration] = useState(true);
-  const [autoSync, setAutoSync] = useState(true);
-  const [firmwareUpdate, setFirmwareUpdate] = useState(false);
 
   const [plan, setPlan] = useState<'FREE' | 'PRO' | 'FAMILY'>('PRO');
   const [isUpgrading, setIsUpgrading] = useState(false);
@@ -52,11 +63,6 @@ const Profile: React.FC<Props> = ({ user, onLogout, isDarkMode, toggleTheme }) =
     setTimeout(() => setTestingNotification(false), 2000);
   };
 
-  const handleUpdateFirmware = () => {
-    setFirmwareUpdate(true);
-    setTimeout(() => setFirmwareUpdate(false), 4000);
-  };
-
   const handlePlanChange = (newPlan: 'FREE' | 'PRO' | 'FAMILY') => {
     setIsUpgrading(true);
     setTimeout(() => {
@@ -68,7 +74,7 @@ const Profile: React.FC<Props> = ({ user, onLogout, isDarkMode, toggleTheme }) =
   const renderHeader = (title: string) => (
     <div className="flex items-center gap-4 mb-4">
       <button 
-        onClick={() => setActiveView('MENU')}
+        onClick={() => window.history.back()}
         className="p-3 bg-slate-50 dark:bg-zinc-900 rounded-2xl text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors"
       >
         <ChevronLeft className="w-5 h-5" />
@@ -76,71 +82,6 @@ const Profile: React.FC<Props> = ({ user, onLogout, isDarkMode, toggleTheme }) =
       <h2 className="text-2xl font-black dark:text-white">{title}</h2>
     </div>
   );
-
-  if (activeView === 'DEVICE') {
-    return (
-      <div className="space-y-6 animate-in slide-in-from-right-4 pb-24">
-        {renderHeader('Device Settings')}
-        <div className="space-y-4">
-          <div className="bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-900 rounded-[2.5rem] p-6 space-y-8 shadow-sm">
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-indigo-500">
-                  <Sliders className="w-5 h-5" />
-                  <h3 className="font-black text-xs uppercase tracking-widest">Prediction Sensitivity</h3>
-                </div>
-                <span className="text-sm font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-zinc-900 px-3 py-1 rounded-full">{sensitivity}%</span>
-              </div>
-              <input 
-                type="range" 
-                min="0" max="100" 
-                value={sensitivity} 
-                onChange={(e) => setSensitivity(parseInt(e.target.value))}
-                className="w-full h-2 bg-slate-200 dark:bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-              />
-              <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-bold uppercase tracking-wider">Higher sensitivity reduces false negatives but may increase false alarms.</p>
-            </section>
-
-            <section className="space-y-4 pt-4 border-t border-slate-50 dark:border-zinc-900">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-emerald-500">
-                  <Activity className="w-5 h-5" />
-                  <span className="font-black text-sm text-slate-700 dark:text-zinc-200">Vibration Feedback</span>
-                </div>
-                <button 
-                  onClick={() => setVibration(!vibration)}
-                  className={`w-14 h-8 rounded-full relative transition-colors duration-300 ${vibration ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-zinc-800'}`}
-                >
-                  <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-sm ${vibration ? 'left-7' : 'left-1'}`} />
-                </button>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-amber-500">
-                  <RefreshCw className="w-5 h-5" />
-                  <span className="font-black text-sm text-slate-700 dark:text-zinc-200">Automatic Cloud Sync</span>
-                </div>
-                <button 
-                  onClick={() => setAutoSync(!autoSync)}
-                  className={`w-14 h-8 rounded-full relative transition-colors duration-300 ${autoSync ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-zinc-800'}`}
-                >
-                  <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-transform duration-300 shadow-sm ${autoSync ? 'left-7' : 'left-1'}`} />
-                </button>
-              </div>
-            </section>
-
-            <button 
-              onClick={handleUpdateFirmware}
-              disabled={firmwareUpdate}
-              className="w-full py-4 bg-slate-50 dark:bg-zinc-900 text-slate-700 dark:text-zinc-200 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-slate-100 dark:hover:bg-zinc-800 transition-all border border-slate-100 dark:border-zinc-800"
-            >
-              {firmwareUpdate ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-              {firmwareUpdate ? 'Updating Hardware...' : 'Check for Firmware Update'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (activeView === 'BILLING') {
     return (
@@ -400,20 +341,7 @@ const Profile: React.FC<Props> = ({ user, onLogout, isDarkMode, toggleTheme }) =
         </button>
 
         <button 
-          onClick={() => setActiveView('DEVICE')}
-          className="w-full flex items-center justify-between p-6 bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-900 rounded-[2.5rem] hover:bg-slate-50 dark:hover:bg-zinc-900 transition-all group shadow-sm"
-        >
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-zinc-900 group-hover:scale-110 transition-transform text-indigo-500">
-              <Sliders className="w-6 h-6" />
-            </div>
-            <span className="font-black text-slate-700 dark:text-zinc-200">Device Settings</span>
-          </div>
-          <ChevronRight className="w-6 h-6 text-slate-300" />
-        </button>
-
-        <button 
-          onClick={() => setActiveView('SECURITY')}
+          onClick={() => navigateTo('SECURITY')}
           className="w-full flex items-center justify-between p-6 bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-900 rounded-[2.5rem] hover:bg-slate-50 dark:hover:bg-zinc-900 transition-all group shadow-sm"
         >
           <div className="flex items-center gap-4">
@@ -426,7 +354,7 @@ const Profile: React.FC<Props> = ({ user, onLogout, isDarkMode, toggleTheme }) =
         </button>
 
         <button 
-          onClick={() => setActiveView('NOTIFICATIONS')}
+          onClick={() => navigateTo('NOTIFICATIONS')}
           className="w-full flex items-center justify-between p-6 bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-900 rounded-[2.5rem] hover:bg-slate-50 dark:hover:bg-zinc-900 transition-all group shadow-sm"
         >
           <div className="flex items-center gap-4">
@@ -439,7 +367,7 @@ const Profile: React.FC<Props> = ({ user, onLogout, isDarkMode, toggleTheme }) =
         </button>
 
         <button 
-          onClick={() => setActiveView('BILLING')}
+          onClick={() => navigateTo('BILLING')}
           className="w-full flex items-center justify-between p-6 bg-white dark:bg-zinc-950 border border-slate-100 dark:border-zinc-900 rounded-[2.5rem] hover:bg-slate-50 dark:hover:bg-zinc-900 transition-all group shadow-sm"
         >
           <div className="flex items-center gap-4">

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, FileText, ShoppingBag, User } from 'lucide-react';
+import { LayoutDashboard, FileText, Watch, User } from 'lucide-react';
 
 export type TabType = 'dashboard' | 'records' | 'marketplace' | 'profile';
 
@@ -13,7 +13,7 @@ const BottomNav: React.FC<Props> = ({ activeTab, onTabChange }) => {
   const tabs = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'records', label: 'History', icon: FileText },
-    { id: 'marketplace', label: 'Shop', icon: ShoppingBag },
+    { id: 'marketplace', label: 'My Device', icon: Watch },
     { id: 'profile', label: 'Me', icon: User },
   ] as const;
 

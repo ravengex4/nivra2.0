@@ -5,7 +5,7 @@ import PatientDashboard from './views/PatientDashboard';
 import CaretakerDashboard from './views/CaretakerDashboard';
 import DoctorDashboard from './views/DoctorDashboard';
 import HealthRecords from './views/HealthRecords';
-import Marketplace from './views/Marketplace';
+import MyDevice from './views/Marketplace';
 import Profile from './views/Profile';
 import Auth from './views/Auth';
 import AlertBanner from './components/AlertBanner';
@@ -128,12 +128,21 @@ const StartupScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
 };
 
 const App: React.FC = () => {
-  const [isStarting, setIsStarting] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
+  const [isStarting, setIsStarting] = useState(() => {
+    return !sessionStorage.getItem('has_started');
+  });
+  const [user, setUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('nivra_user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [view, setView] = useState<'AUTH' | 'DASHBOARD'>('AUTH');
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [view, setView] = useState<'AUTH' | 'DASHBOARD'>(() => {
+    return localStorage.getItem('nivra_user') ? 'DASHBOARD' : 'AUTH';
+  });
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    return (localStorage.getItem('nivra_active_tab') as TabType) || 'dashboard';
+  });
 
   useEffect(() => {
     const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -151,13 +160,44 @@ const App: React.FC = () => {
   const handleLogin = (loggedUser: User) => {
     setUser(loggedUser);
     setView('DASHBOARD');
+    localStorage.setItem('nivra_user', JSON.stringify(loggedUser));
+    window.history.pushState({ tab: 'dashboard' }, '', '');
   };
 
   const handleLogout = () => {
     setUser(null);
     setView('AUTH');
     setActiveTab('dashboard');
+    localStorage.removeItem('nivra_user');
+    localStorage.removeItem('nivra_active_tab');
+    window.history.pushState(null, '', '');
   };
+
+  const handleTabChange = (tab: TabType) => {
+    if (activeTab === tab) return;
+
+    if (activeTab !== 'dashboard' && tab !== 'dashboard') {
+      window.history.replaceState({ tab }, '', '');
+    } else {
+      window.history.pushState({ tab }, '', '');
+    }
+
+    setActiveTab(tab);
+    localStorage.setItem('nivra_active_tab', tab);
+  };
+
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (view === 'DASHBOARD') {
+        const newTab = event.state?.tab || 'dashboard';
+        setActiveTab(newTab);
+        localStorage.setItem('nivra_active_tab', newTab);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [view]);
 
   const triggerEmergency = useCallback(() => {
     const newAlert: Alert = {
@@ -184,24 +224,31 @@ const App: React.FC = () => {
     if (!user) return null;
     if (activeTab === 'profile') return <Profile user={user} onLogout={handleLogout} isDarkMode={isDarkMode} toggleTheme={() => setIsDarkMode(!isDarkMode)} />;
     if (activeTab === 'records') return <HealthRecords user={user} />;
-    if (activeTab === 'marketplace') return <Marketplace />;
+    if (activeTab === 'marketplace') return <MyDevice />;
     switch (user.role) {
-      case UserRole.PATIENT: return <PatientDashboard user={user} onTabChange={setActiveTab} bandImage={BandImage} />;
+      case UserRole.PATIENT: return <PatientDashboard user={user} onTabChange={handleTabChange} bandImage={BandImage} />;
       case UserRole.CARETAKER: return <CaretakerDashboard user={user} />;
-      case UserRole.DOCTOR: return <DoctorDashboard user={user} onTabChange={setActiveTab} />;
+      case UserRole.DOCTOR: return <DoctorDashboard user={user} onTabChange={handleTabChange} />;
       default: return null;
     }
   };
 
-  if (isStarting) return <StartupScreen onComplete={() => setIsStarting(false)} />;
+  if (isStarting) return <StartupScreen onComplete={() => {
+    sessionStorage.setItem('has_started', 'true');
+    setIsStarting(false);
+  }} />;
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-white dark:bg-black text-slate-900 dark:text-zinc-100 transition-colors duration-300 animate-in fade-in duration-1000">
       {alerts.filter(a => a.active).map(alert => <AlertBanner key={alert.id} alert={alert} onDismiss={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, active: false } : a))} />)}
       {view === 'AUTH' ? <Auth onLogin={handleLogin} /> : (
         <>
-          <main className="max-w-4xl mx-auto px-3 sm:px-6 pt-8 pb-24">{renderActiveTab()}</main>
-          <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+          <main className="max-w-4xl mx-auto px-3 sm:px-6 pt-8 pb-24">
+            <div key={activeTab} className="animate-in fade-in slide-in-from-bottom-4 duration-1000">
+              {renderActiveTab()}
+            </div>
+          </main>
+          <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
         </>
       )}
     </div>
