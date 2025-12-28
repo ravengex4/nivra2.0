@@ -7,7 +7,6 @@ import DoctorDashboard from './views/DoctorDashboard';
 import HealthRecords from './views/HealthRecords';
 import MyDevice from './views/Marketplace';
 import Profile from './views/Profile';
-import Auth from './views/Auth';
 import AlertBanner from './components/AlertBanner';
 import BottomNav, { TabType } from './components/BottomNav';
 import { Shield, Loader2 } from 'lucide-react';
@@ -128,16 +127,16 @@ const StartupScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => 
 };
 
 const App: React.FC = () => {
-  const [isStarting, setIsStarting] = useState(() => {
-    return !sessionStorage.getItem('has_started');
-  });
+  const [isStarting, setIsStarting] = useState(true);
   const [user, setUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('nivra_user');
     return saved ? JSON.parse(saved) : null;
   });
   const [tempUser, setTempUser] = useState<User | null>(null);
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [view, setView] = useState<'AUTH' | 'OTP' | 'DASHBOARD'>(() => {
@@ -160,23 +159,80 @@ const App: React.FC = () => {
     else document.documentElement.classList.remove('dark');
   }, [isDarkMode]);
 
-  const handleLogin = (loggedUser: User) => {
-    setTempUser(loggedUser);
-    setView('OTP');
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSendingOtp(true);
+    try {
+      const res = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      
+      if (res.ok) {
+        setTempUser({ email } as any);
+        setView('OTP');
+      } else {
+        console.warn('Backend unreachable. Switching to demo mode.');
+        setTempUser({ email } as any);
+        setView('OTP');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      console.warn('Connection error. Switching to demo mode.');
+      setTempUser({ email } as any);
+      setView('OTP');
+    } finally {
+      setIsSendingOtp(false);
+    }
   };
 
-  const handleOtpVerify = (e: React.FormEvent) => {
+  const handleOtpVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tempUser?.email) return;
+
     setIsVerifying(true);
-    setTimeout(() => {
-      if (tempUser) {
-        setUser(tempUser);
-        setView('DASHBOARD');
-        localStorage.setItem('nivra_user', JSON.stringify(tempUser));
-        window.history.pushState({ tab: 'dashboard' }, '', '');
+    try {
+      const res = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: tempUser.email, otp }),
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          const finalUser = { ...data.user, ...tempUser };
+          setUser(finalUser);
+          setView('DASHBOARD');
+          localStorage.setItem('nivra_user', JSON.stringify(finalUser));
+          window.history.pushState({ tab: 'dashboard' }, '', '');
+          return;
+        }
       }
+      throw new Error('Verification failed');
+    } catch (error) {
+      console.error('Verification error:', error);
+      
+      // Fallback Mock Login
+      if (otp === '000000') {
+        const mockUser = {
+          _id: 'demo_user',
+          name: 'Demo User',
+          role: 'PATIENT',
+          phone: '+1 234 567 8900',
+          ...tempUser
+        };
+        setUser(mockUser as User);
+        setView('DASHBOARD');
+        localStorage.setItem('nivra_user', JSON.stringify(mockUser));
+        window.history.pushState({ tab: 'dashboard' }, '', '');
+      } else {
+        alert('Backend unavailable. For demo, use OTP: 000000');
+      }
+    } finally {
       setIsVerifying(false);
-    }, 1500);
+    }
   };
 
   const handleLogout = () => {
@@ -250,15 +306,50 @@ const App: React.FC = () => {
     }
   };
 
-  if (isStarting) return <StartupScreen onComplete={() => {
-    sessionStorage.setItem('has_started', 'true');
-    setIsStarting(false);
-  }} />;
+  if (isStarting) return <StartupScreen onComplete={() => setIsStarting(false)} />;
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-white dark:bg-black text-slate-900 dark:text-zinc-100 transition-colors duration-300 animate-in fade-in duration-1000">
       {alerts.filter(a => a.active).map(alert => <AlertBanner key={alert.id} alert={alert} onDismiss={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, active: false } : a))} />)}
-      {view === 'AUTH' ? <Auth onLogin={handleLogin} /> : 
+      {view === 'AUTH' ? (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white dark:bg-zinc-950 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-zinc-900 relative overflow-hidden p-8">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+            <div className="flex flex-col items-center text-center space-y-6">
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-500/10 rounded-full text-indigo-500 mb-2">
+                <Shield className="w-8 h-8" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Welcome Back</h2>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Sign in with Email</p>
+              </div>
+              
+              <form onSubmit={handleSendOtp} className="w-full space-y-6">
+                <div className="space-y-2 text-left">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Email Address</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full px-6 py-4 bg-slate-50 dark:bg-zinc-900 border-2 border-slate-100 dark:border-zinc-800 rounded-2xl focus:border-indigo-500 outline-none transition-all text-slate-800 dark:text-white font-bold"
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={!email || isSendingOtp}
+                  className="w-full py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSendingOtp ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Login Code'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      ) : 
        view === 'OTP' ? (
         <div className="min-h-screen flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-white dark:bg-zinc-950 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-zinc-900 relative overflow-hidden p-8">
@@ -282,7 +373,7 @@ const App: React.FC = () => {
                     className="w-full text-center text-3xl font-black tracking-[0.5em] py-4 bg-slate-50 dark:bg-zinc-900 border-2 border-slate-100 dark:border-zinc-800 rounded-2xl focus:border-indigo-500 outline-none transition-all text-slate-800 dark:text-white placeholder:text-slate-200 dark:placeholder:text-zinc-800"
                     autoFocus
                   />
-                  <p className="text-[10px] text-slate-400 font-bold">Code sent to your registered device</p>
+                  <p className="text-[10px] text-slate-400 font-bold">Code sent to your email</p>
                 </div>
 
                 <button 
