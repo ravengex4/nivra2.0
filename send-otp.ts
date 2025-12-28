@@ -7,14 +7,6 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 });
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
-});
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -34,6 +26,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     console.log(`[Auth] Sending OTP to ${normalizedEmail}`);
 
+    // Initialize transporter lazily to prevent top-level crashes
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+      },
+    });
+
     // Store in Redis: Key="otp:user@example.com", Value="123456", Expiry=300s (5 mins)
     await redis.set(`otp:${normalizedEmail}`, otp, { ex: 300 });
 
@@ -48,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     return res.status(200).json({ success: true, message: 'OTP sent successfully' });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Nodemailer Error:', error);
+    return res.status(500).json({ error: error.message || 'Failed to send email' });
   }
 }

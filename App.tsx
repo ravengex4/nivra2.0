@@ -173,14 +173,18 @@ const App: React.FC = () => {
         setTempUser({ email } as any);
         setView('OTP');
       } else {
-        console.warn('Backend unreachable. Switching to demo mode.');
+        const data = await res.json().catch(() => ({ error: 'Backend unreachable' }));
+        console.warn('Backend error:', data.error);
+        alert(`Backend Issue: ${data.error}\n\nSwitched to Demo Mode.\nOTP '000000' has been pre-filled.`);
         setTempUser({ email } as any);
+        setOtp('000000');
         setView('OTP');
       }
     } catch (error) {
       console.error('Login error:', error);
-      console.warn('Connection error. Switching to demo mode.');
+      console.warn('Connection error. Switching to demo mode with pre-filled OTP.');
       setTempUser({ email } as any);
+      setOtp('000000');
       setView('OTP');
     } finally {
       setIsSendingOtp(false);
