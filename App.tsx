@@ -135,9 +135,12 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('nivra_user');
     return saved ? JSON.parse(saved) : null;
   });
+  const [tempUser, setTempUser] = useState<User | null>(null);
+  const [otp, setOtp] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [view, setView] = useState<'AUTH' | 'DASHBOARD'>(() => {
+  const [view, setView] = useState<'AUTH' | 'OTP' | 'DASHBOARD'>(() => {
     return localStorage.getItem('nivra_user') ? 'DASHBOARD' : 'AUTH';
   });
   const [activeTab, setActiveTab] = useState<TabType>(() => {
@@ -158,14 +161,28 @@ const App: React.FC = () => {
   }, [isDarkMode]);
 
   const handleLogin = (loggedUser: User) => {
-    setUser(loggedUser);
-    setView('DASHBOARD');
-    localStorage.setItem('nivra_user', JSON.stringify(loggedUser));
-    window.history.pushState({ tab: 'dashboard' }, '', '');
+    setTempUser(loggedUser);
+    setView('OTP');
+  };
+
+  const handleOtpVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsVerifying(true);
+    setTimeout(() => {
+      if (tempUser) {
+        setUser(tempUser);
+        setView('DASHBOARD');
+        localStorage.setItem('nivra_user', JSON.stringify(tempUser));
+        window.history.pushState({ tab: 'dashboard' }, '', '');
+      }
+      setIsVerifying(false);
+    }, 1500);
   };
 
   const handleLogout = () => {
     setUser(null);
+    setTempUser(null);
+    setOtp('');
     setView('AUTH');
     setActiveTab('dashboard');
     localStorage.removeItem('nivra_user');
@@ -241,7 +258,49 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-white dark:bg-black text-slate-900 dark:text-zinc-100 transition-colors duration-300 animate-in fade-in duration-1000">
       {alerts.filter(a => a.active).map(alert => <AlertBanner key={alert.id} alert={alert} onDismiss={() => setAlerts(prev => prev.map(a => a.id === alert.id ? { ...a, active: false } : a))} />)}
-      {view === 'AUTH' ? <Auth onLogin={handleLogin} /> : (
+      {view === 'AUTH' ? <Auth onLogin={handleLogin} /> : 
+       view === 'OTP' ? (
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white dark:bg-zinc-950 rounded-[2.5rem] shadow-2xl border border-slate-100 dark:border-zinc-900 relative overflow-hidden p-8">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+            <div className="flex flex-col items-center text-center space-y-6">
+              <div className="p-4 bg-indigo-50 dark:bg-indigo-500/10 rounded-full text-indigo-500 mb-2">
+                <Shield className="w-8 h-8" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Security Check</h2>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-2">Enter verification code</p>
+              </div>
+              
+              <form onSubmit={handleOtpVerify} className="w-full space-y-6">
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    className="w-full text-center text-3xl font-black tracking-[0.5em] py-4 bg-slate-50 dark:bg-zinc-900 border-2 border-slate-100 dark:border-zinc-800 rounded-2xl focus:border-indigo-500 outline-none transition-all text-slate-800 dark:text-white placeholder:text-slate-200 dark:placeholder:text-zinc-800"
+                    autoFocus
+                  />
+                  <p className="text-[10px] text-slate-400 font-bold">Code sent to your registered device</p>
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={otp.length !== 6 || isVerifying}
+                  className="w-full py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Verify Identity'}
+                </button>
+              </form>
+              
+              <button onClick={() => setView('AUTH')} className="text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-zinc-300 transition-colors">
+                Back to Login
+              </button>
+            </div>
+          </div>
+        </div>
+       ) : (
         <>
           <main className="max-w-4xl mx-auto px-3 sm:px-6 pt-8 pb-24">
             <div key={activeTab} className="animate-in fade-in slide-in-from-bottom-4 duration-1000">
